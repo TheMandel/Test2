@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Quiz</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .question { margin-bottom: 25px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .correct { color: green; font-weight: bold; }
+        .wrong { color: red; font-weight: bold; }
+        .solution { margin-top: 5px; font-size: 0.9em; }
+        .qid { font-size: 0.8em; color: #666; }
+    </style>
+</head>
+<body>
+
+<h1>Zufallsquiz</h1>
+
+<label>Fragenkatalog auswählen:</label>
+<select id="catalog">
+    <option value="">-- Bitte wählen --</option>
+    <option value="LA1.json">Handwerksordnung</option>
+</select>
+
+<br><br>
+
+<label>Wie viele Fragen möchtest du üben?</label>
+<input type="number" id="count" min="1" value="5">
+<button onclick="startQuiz()">Quiz starten</button>
+
+<div id="quiz"></div>
+<button id="checkBtn" onclick="checkAnswers()" style="display:none;">Auswerten</button>
+
+<div id="result"></div>
+
+<script>
+let allQuestions = [];
+let currentQuiz = [];
+
+// JSON laden
+function loadCatalog() {
+    const file = document.getElementById("catalog").value;
+
+    if (!file) {
+        alert("Bitte einen Fragenkatalog auswählen!");
+        return Promise.reject("Kein Katalog gewählt");
+    }
+
+    return fetch(file)
+        .then(r => {
+            if (!r.ok) throw new Error("Datei nicht gefunden: " + file);
+            return r.json();
+        })
+        .then(data => {
+            allQuestions = data;
+            console.log("Katalog geladen:", file, allQuestions);
+        })
+        .catch(err => {
+            alert("Fehler beim Laden der Datei: " + err.message);
+            throw err;
+        });
+}
+
+function startQuiz() {
+    loadCatalog().then(() => {
+        const count = parseInt(document.getElementById("count").value);
+        const quizDiv = document.getElementById("quiz");
+
+        quizDiv.innerHTML = "";
+        document.getElementById("result").innerHTML = "";
+        document.getElementById("checkBtn").style.display = "block";
+
+        if (count > allQuestions.length) {
+            alert("Es sind nicht genug Fragen im Katalog!");
+            return;
+        }
+
+        // Zufällige Fragen auswählen
+        currentQuiz = [...allQuestions]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, count);
+
+        currentQuiz.forEach((q, index) => {
+            const div = document.createElement("div");
+            div.className = "question";
+
+            div.innerHTML = `
+                <div class="qid">Frage-ID: ${q.id}</div>
+                <h3>${index + 1}. ${q.frage}</h3>
+            `;
+
+            q.antworten.forEach((ans, i) => {
+                div.innerHTML += `
+                    <label>
+                        <input type="checkbox" name="q${index}" value="${i}">
+                        ${ans.text}
+                    </label><br>
+                `;
+            });
+
+            div.innerHTML += `<div id="solution${index}" class="solution"></div>`;
+            quizDiv.appendChild(div);
+        });
+    });
+}
+
+function checkAnswers() {
+    let correctCount = 0;
+
+    currentQuiz.forEach((q, index) => {
+        const checkboxes = document.querySelectorAll(`input[name="q${index}"]`);
+        let allCorrect = true;
+        let solutionText = "Richtige Antwort(en): ";
+
+        q.antworten.forEach((ans, i) => {
+            if (ans.richtig) solutionText += ans.text + "; ";
+        });
+
+        checkboxes.forEach((box, i) => {
+            const isChecked = box.checked;
+            const shouldBeChecked = q.antworten[i].richtig;
+
+            if (isChecked && shouldBeChecked) {
+                box.parentElement.classList.add("correct");
+            } else if (isChecked && !shouldBeChecked) {
+                box.parentElement.classList.add("wrong");
+                allCorrect = false;
+            } else if (!isChecked && shouldBeChecked) {
+                allCorrect = false;
+            }
+        });
+
+        if (allCorrect) correctCount++;
+
+        document.getElementById("solution" + index).innerHTML = solutionText;
+    });
+
+    document.getElementById("result").innerHTML =
+        `<h2>Ergebnis: ${correctCount} von ${currentQuiz.length} richtig</h2>`;
+}
+</script>
+
+</body>
+</html>
